@@ -7,8 +7,8 @@
     <ProjectGuid>{662F09CD-FE23-4573-B71D-594C10424AFA}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SR_QGG</RootNamespace>
-    <AssemblyName>SR_QGG</AssemblyName>
+    <RootNamespace>SirRolin.QuestsGiveGoodwill</RootNamespace>
+    <AssemblyName>SirRolin.QuestsGiveGoodwill</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -64,10 +64,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SR_QGG.cs">
-      <Link>SR_QGG.cs</Link>
-    </Compile>
+    <Compile Include="HarmonyPatches\DoGenerate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Settings.cs" />
+    <Compile Include="SettingsGUI.cs" />
+    <Compile Include="StaticConstructor.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
