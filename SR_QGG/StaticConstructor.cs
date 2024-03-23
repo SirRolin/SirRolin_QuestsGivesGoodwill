@@ -9,7 +9,6 @@ using Verse;
 
 namespace SirRolin.QuestsGiveGoodwill
 {
-
     [StaticConstructorOnStartup]
     public class StaticConstructor
     {

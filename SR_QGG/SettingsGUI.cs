@@ -1,10 +1,10 @@
-﻿using System;
+﻿using RimWorld;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 using Verse;
+using Verse.Noise;
 
 namespace SirRolin.QuestsGiveGoodwill
 {
@@ -21,10 +21,30 @@ namespace SirRolin.QuestsGiveGoodwill
         }
 
         /// <summary>
-        /// Settings Strings
+        /// Settings Strings, can't be from a list, but can from an array or loose variables.
         /// </summary>
+        private string maxGoodwillLossText;
+        private string maxGoodwillGainText;
+        private string goodwillWorthText;
+        private string extraProGoodwillText;
         private string extraFlatGoodwillText;
-        private string extraproGoodwillText;
+        private string extraLootTriesText;
+        private string extraLootMinWorthText;
+
+        private string hounourWorthText;
+        private string camplootProWorthText;
+        private string minLootRewardText;
+        private string boostRewardsProText;
+
+        private Vector2 scrollPositions = new Vector2(0f, 0f);
+
+        private const float ScrollBarWidthMargin = 20f;
+        private float totalContentHeight = 10000f; //// corrected on every frame.
+        private float goodwillSectionHeight = 420f;
+        private float honourSectionHeight = 124f;
+        private float itemSectionHeight = 420f;
+
+        private int resetClicks = 0;
 
         /// <summary>
         /// The (optional) GUI part to set your settings.
@@ -32,42 +52,242 @@ namespace SirRolin.QuestsGiveGoodwill
         /// <param name="inRect">A Unity Rect with the size of the settings window.</param>
         public override void DoSettingsWindowContents(Rect inRect)
         {
+            //// Create Scrollable Window.
+            Rect outerRect = inRect.ContractedBy(10f);
+            bool scrollBarVisible = totalContentHeight > outerRect.height;
+            if (scrollBarVisible)
+                inRect.width = inRect.width - ScrollBarWidthMargin;
+            Rect scrollViewTotal = new Rect(inRect.x, inRect.y, inRect.width - (scrollBarVisible ? ScrollBarWidthMargin : 0), totalContentHeight);
+            Widgets.BeginScrollView(outerRect, ref scrollPositions, scrollViewTotal);
             Listing_Standard listingStandard = new Listing_Standard();
-            listingStandard.Begin(inRect);
+            listingStandard.Begin(scrollViewTotal);
+
+            //// Giving an Example
+            listingStandard.Label("With current settings the rewards will be boosted by:");
+            float exampleReward = 1000f;
+            float exampleRewardAfter = exampleReward * (1f + (settings.boostRewards ? (settings.boostRewardsProcentage / 100f) : 0f));
+            float exampleGoodwillGain = exampleRewardAfter * (settings.extraGoodwillPro / 100f) / settings.goodwillWorth + settings.extraGoodwillFlat;
+            listingStandard.Label(
+                String.Format("{0:N}$ -> {1:N2}$ plus {2:N2} Goodwill.",
+                    exampleReward,
+                    exampleRewardAfter,
+                    Math.Round(exampleGoodwillGain, 2)
+                    ));
+
+            listingStandard.GapLine();
+
+            if (listingStandard.ButtonText(resetClicks == 0 ? "Reset All" : resetClicks < 5 ? "You Sure you want to reset? (" + resetClicks + " out of 5)" : "Last Chance, Reset?"))
+            {
+                resetClicks++;
+                if (resetClicks > 5)
+                {
+                    resetALl();
+                }
+            }
 
             //// Goodwill
             listingStandard.Label("Goodwill: ");
-            //listingStandard.Indent();
-            //listingStandard.ColumnWidth = listingStandard.ColumnWidth - 10;
-            listingStandard.CheckboxLabeled("Can Goodwill be negative? (default Yes)", ref settings.canGoodwillBeNegative, "Sometimes quest rewards are worth more than the quest is worth, I take this as the quest givers are desperate, but unhappy about the price.");
-            listingStandard.Label("What's the worth of goodwill in items? " + settings.goodwillWorth + " (Default 100)");
-            settings.goodwillWorth = (int) listingStandard.Slider(settings.goodwillWorth, 50, 500);
-            listingStandard.Label(settings.extraGoodwillPro + "% extra wealth for goodwill. (negative in case you want to roleplay hostile world) (Default 20%)");
-            listingStandard.TextFieldNumeric(ref settings.extraGoodwillPro, ref extraproGoodwillText, -100f, 200f);
-            //settings.extraGoodwillPro = listingStandard.Slider(settings.extraGoodwillPro, -100f, 200f); //// I can make it work but only be stealing code, which I don't wanna.
-            listingStandard.Label(settings.extraGoodwillFlat + " flat extra goodwill on all quest rewards. (Default 2)");
-            listingStandard.TextFieldNumeric(ref settings.extraGoodwillFlat, ref extraFlatGoodwillText, -10, 10);
+            Listing_Standard goodwillSection = listingStandard.BeginSection(goodwillSectionHeight, bottomBorder: 0);
+            goodwillSection.CheckboxLabeled("Enable Negative Goodwill Rewards (default Yes)", ref settings.canGoodwillBeNegative, "Sometimes quest rewards are worth more than the quest is worth, I take this as the quest givers are desperate, but unhappy about the price.");
+
+            if (settings.canGoodwillBeNegative)
+            {
+
+                CreateSliderPlusTextField(goodwillSection,
+                    "Max negative goodwill (Default 20)",
+                    ref maxGoodwillLossText,
+                    ref settings.maxGoodwillLoss,
+                    min: 0, max: 100,
+                    steps: 5);
+            }
+
+            CreateSliderPlusTextField(goodwillSection,
+                "Max goodwill gain (Default 20)",
+                ref maxGoodwillGainText,
+                ref settings.maxGoodwillGain,
+                min: 0, max: 100,
+                hover: "Overflow generates more items instead.");
+
+            CreateSliderPlusTextField(goodwillSection,
+                "The worth of Goodwill in " + RimWorld.ThingDefOf.Silver.defName + "? " + settings.goodwillWorth + "$ (Default 100$)",
+                ref goodwillWorthText,
+                ref settings.goodwillWorth,
+                min: 50f, max: 500f, steps: 0.5f);
+
+            CreateSliderPlusTextField(goodwillSection,
+                settings.extraGoodwillPro + "% extra wealth for goodwill. (negative in case you want to roleplay hostile world) (Default 20%)",
+                ref extraProGoodwillText,
+                ref settings.extraGoodwillPro,
+                min: -100f, max: 200f, steps: 0.5f);
+
+            CreateSliderPlusTextField(goodwillSection,
+                settings.extraGoodwillFlat + " flat extra goodwill on all quest rewards. (Default 5)",
+                ref extraFlatGoodwillText,
+                ref settings.extraGoodwillFlat,
+                min: -20, max: 20);
+
+            goodwillSection.CheckboxLabeled("Enable Goodwill Overflow to extra loot (default Yes)", ref settings.tooMuchGoodwillGivesExtraLoot, "If goodwill caps for some reason grant extra loot.");
+
+
+            listingStandard.EndSection(goodwillSection);
+            listingStandard.Gap();
+
 
             //// Honour
-            //listingStandard.Outdent();
-            //listingStandard.ColumnWidth = listingStandard.ColumnWidth + 10;
-            listingStandard.Label(""); //// just for some space
             listingStandard.Label("Honour: ");
-            //listingStandard.Indent();
-            //listingStandard.ColumnWidth = listingStandard.ColumnWidth - 10;
-            listingStandard.Label("When Honour is offered, should it Only be honour that's offered? (Default Yes)");
-            listingStandard.CheckboxLabeled("Goodwill cannot be offered with Honour: ", ref settings.honourIgnoresGoodwill);
-            listingStandard.Label("What's the worth of honour in items? (Default 100)" + settings.honourWorth);
-            settings.honourWorth = (int) listingStandard.Slider(settings.honourWorth, 50, 500);
-            //listingStandard.Outdent();
-            //listingStandard.ColumnWidth = listingStandard.ColumnWidth + 10;
+            Listing_Standard honourSection = listingStandard.BeginSection(honourSectionHeight, bottomBorder: 0);
+            honourSection.Label("When Honour is a reward, should I ignore goodwill? (Default Yes)");
+            honourSection.CheckboxLabeled("Goodwill cannot be offered with Honour: ", ref settings.honourIgnoresGoodwill);
+            if (!settings.honourIgnoresGoodwill)
+                CreateSliderPlusTextField(honourSection,
+                    "The worth of Honour in items? (Default 100) " + settings.honourWorth + "$",
+                    ref hounourWorthText,
+                    ref settings.honourWorth,
+                    min: 50, max: 500,
+                    steps: 5);
+
+            listingStandard.EndSection(honourSection);
+
+            listingStandard.Gap();
+            //// Items
+            listingStandard.Label("Items: ");
+            Listing_Standard otherSection = listingStandard.BeginSection(itemSectionHeight, bottomBorder: 0);
+            otherSection.CheckboxLabeled("When Camp loot is a reward, should I ignore goodwill? (Default yes)", ref settings.campLootIgnoresGoodwill);
+
+            if (!settings.campLootIgnoresGoodwill)
+                CreateSliderPlusTextField(otherSection,
+                    "Camp Loot % worth of reward.",
+                    ref camplootProWorthText,
+                    ref settings.campLootProcentValue,
+                    min: -100, max: 100);
+
+            otherSection.CheckboxLabeled("Enable Minimum Item Reward patch? (Default yes)", ref settings.enableMinLootValue);
+
+            if (settings.enableMinLootValue)
+                CreateSliderPlusTextField(otherSection,
+                    "min % of reward allowed to be generated. (Vanilla: ~13%. Default 30%)",
+                    ref minLootRewardText,
+                    ref settings.minLootValueProOfReward,
+                    min: 0f, max: 80f, steps: 0.5f);
+
+
+            otherSection.CheckboxLabeled("Enable Extra Reward patch? (Default yes)", ref settings.boostRewards);
+
+            if (settings.boostRewards)
+            {
+                CreateSliderPlusTextField(otherSection,
+                    "Boost rewards by a %. (Default 20%)",
+                    ref boostRewardsProText,
+                    ref settings.boostRewardsProcentage,
+                    min: -100f, max: 500f, steps: 0.5f);
+            }
+
+            CreateSliderPlusTextField(otherSection,
+                settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 2) - 1 Tends to give very little or overshoot allot. - 2 from my experience hits the mark. - 3+ Tends to overshoot. ",
+                ref extraLootTriesText,
+                ref settings.extraLootTries,
+                min: 1, max: 4);
+                
+            CreateSliderPlusTextField(otherSection,
+                settings.extraLootMinWorthForTry + " item generation cycles. (Vanilla 1, Default 2) - 1 Tends to give very little or overshoot allot. - 2 from my experience hits the mark. - 3+ Tends to overshoot. ",
+                ref extraLootMinWorthText,
+                ref settings.extraLootMinWorthForTry,
+                min: 0, max: 1000, steps: 5);
+
+            otherSection.CheckboxLabeled("Give Silver for the remainder of the reward? (Default yes)", ref settings.enableSilverRemainder);
+
+            listingStandard.EndSection(otherSection);
+
 
             //// Debugging
-            listingStandard.CheckboxLabeled("Debugging Overflow", ref settings.debuggingOverflow, "Default No. Not needed by anyone but sir Rolin.");
+            if (Prefs.DevMode)
+            {
+                listingStandard.Gap();
+                listingStandard.Label("Developer Menu");
+                Listing_Standard devSec = listingStandard.BeginSection(24f, bottomBorder: 0);
+                devSec.CheckboxLabeled("Debugging Overflow", ref settings.debuggingOverflow, "(Default No)");
+                listingStandard.EndSection(devSec);
+            }
 
+            //// correcting the size of the window.
+            if (totalContentHeight == 10000f)
+                totalContentHeight = listingStandard.CurHeight;
 
+            //// finishing the views (to avoid errors)
             listingStandard.End();
+            Widgets.EndScrollView();
             base.DoSettingsWindowContents(inRect);
+        }
+
+        /// <summary>
+        /// Creates a label to explain the setting, a text field and a slider which set the same setting
+        /// </summary>
+        /// <param name="ls">listing Standard to insert the ui</param>
+        /// <param name="label">explanation text</param>
+        /// <param name="textReference">a reference to a string that should be stored in the class (but not in a list)</param>
+        /// <param name="settingRef">reference to setting value</param>
+        /// <param name="min">lowest value</param>
+        /// <param name="max">highest value</param>
+        /// <param name="degits">rounding</param>
+        /// <param name="hover">tooltip when hovering</param>
+        private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref float settingRef, float min, float max, int degits = 1, string hover = null, float steps = 1f)
+        {
+            if (degits < 0) degits = 0;
+            ls.Label(label, tooltip: hover);
+            ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
+            textReference = String.Format("{0:N" + degits + "}", RoundToNearest(ls.Slider(settingRef, min, max), steps));
+        }
+
+        private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref int settingRef, int min, int max, string hover = null, int steps = 1)
+        {
+            ls.Label(label, -1, hover);
+            ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
+            textReference = ((int) RoundToNearest(ls.Slider(settingRef, min, max), steps)).ToString();
+        }
+
+        private double RoundToNearest(double number, double multiple)
+        {
+            if (multiple != 0)
+            {
+                return Math.Round(number / multiple) * multiple;
+            }
+            else
+            {
+                return Math.Round(number);
+            }
+        }
+
+        private void resetALl()
+        {
+            //// Goodwill
+            maxGoodwillLossText = "20";
+            goodwillWorthText = "100.0";
+            extraProGoodwillText = "20.0";
+            extraFlatGoodwillText = "5";
+            maxGoodwillGainText = "20";
+            settings.canGoodwillBeNegative = true;
+
+            //// Honour
+            settings.honourIgnoresGoodwill = true;
+            hounourWorthText = "100.0";
+
+            //// SpecificLootBehaivior
+            settings.campLootIgnoresGoodwill = true;
+            camplootProWorthText = "50";
+
+            settings.enableMinLootValue = true;
+            minLootRewardText = "30.0";
+            extraLootTriesText = "2";
+            extraLootMinWorthText = "200";
+            settings.enableSilverRemainder = true;
+
+
+            //// Boost Rewards
+            settings.boostRewards = true;
+            boostRewardsProText = "20.0";
+
+            //// debugging
+            settings.debuggingOverflow = false;
         }
 
         /// <summary>
