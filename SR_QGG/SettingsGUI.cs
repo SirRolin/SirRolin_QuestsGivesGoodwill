@@ -63,7 +63,7 @@ namespace SirRolin.QuestsGiveGoodwill
             listingStandard.Begin(scrollViewTotal);
 
             //// Giving an Example
-            listingStandard.Label("With current settings the rewards will be boosted by:");
+            listingStandard.Label("With current settings the average reward boosting will be like this:");
             float exampleReward = 1000f;
             float exampleRewardAfter = exampleReward * (1f + (settings.boostRewards ? (settings.boostRewardsProcentage / 100f) : 0f));
             float exampleGoodwillGain = exampleRewardAfter * (settings.extraGoodwillPro / 100f) / settings.goodwillWorth + settings.extraGoodwillFlat;
@@ -72,6 +72,18 @@ namespace SirRolin.QuestsGiveGoodwill
                     exampleReward,
                     exampleRewardAfter,
                     Math.Round(exampleGoodwillGain, 2)
+                    ));
+
+            listingStandard.Label("With current settings the rough edgecasing would be like this:");
+            float minExampleReward = Mathf.Min(exampleRewardAfter * (1-Mathf.Pow(0.5f, settings.extraLootTries)), exampleRewardAfter - settings.extraLootMinWorthForTry);
+            listingStandard.Label(
+                String.Format("{0:N} to {1:N2}$ -> {2:N2} to {3:N2}$ plus {4:N2} to {5:N2} Goodwill.",
+                    Math.Round(exampleReward * 0.5f, 2),
+                    Math.Round(exampleReward * 1.5f, 2),
+                    Math.Round(minExampleReward, 2),
+                    Math.Round(exampleRewardAfter * 1.5f),
+                    Math.Round(((exampleRewardAfter - minExampleReward) / settings.goodwillWorth) + settings.extraGoodwillFlat, 2),
+                    Math.Round((exampleGoodwillGain - (exampleGoodwillGain * 1.5f)) / settings.goodwillWorth + settings.extraGoodwillFlat, 2)
                     ));
 
             listingStandard.GapLine();
@@ -183,16 +195,16 @@ namespace SirRolin.QuestsGiveGoodwill
             }
 
             CreateSliderPlusTextField(otherSection,
-                settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 2) - 1 Tends to give very little or overshoot allot. - 2 from my experience hits the mark. - 3+ Tends to overshoot. ",
+                settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 2)",
                 ref extraLootTriesText,
                 ref settings.extraLootTries,
                 min: 1, max: 4);
                 
             CreateSliderPlusTextField(otherSection,
-                settings.extraLootMinWorthForTry + " item generation cycles. (Vanilla 1, Default 2) - 1 Tends to give very little or overshoot allot. - 2 from my experience hits the mark. - 3+ Tends to overshoot. ",
+                settings.extraLootMinWorthForTry + "$ minimally needed for additional loot generation tries. (default 200) - Setting this low and Item generation cycles high, will often result in more value, but less goodwill.",
                 ref extraLootMinWorthText,
                 ref settings.extraLootMinWorthForTry,
-                min: 0, max: 1000, steps: 5);
+                min: 0, max: 2000, steps: 5);
 
             otherSection.CheckboxLabeled("Give Silver for the remainder of the reward? (Default yes)", ref settings.enableSilverRemainder);
 
@@ -297,7 +309,7 @@ namespace SirRolin.QuestsGiveGoodwill
         /// <returns>The (translated) mod name.</returns>
         public override string SettingsCategory()
         {
-            return "QuestsGiveGoodwill";
+            return "QuestsGiveGoodwill".Translate();
         }
     }
 }
