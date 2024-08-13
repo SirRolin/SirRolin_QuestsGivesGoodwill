@@ -16,11 +16,11 @@ namespace SirRolin.QuestsGiveGoodwill
         public int maxGoodwillGain = 20;
         public int maxGoodwillLoss= 20;
         public bool canGoodwillBeNegative = true;
-        public bool tooMuchGoodwillGivesExtraLoot = true;
+        public bool tooMuchGoodwillGivesSilver = true;
 
         //// Honour
         public bool honourIgnoresGoodwill = true;
-        public float honourWorth = 100f;
+        public float honourWorth = 666f;
 
         //// SpecificLootBehaivior
         public bool campLootIgnoresGoodwill = true;
@@ -29,8 +29,11 @@ namespace SirRolin.QuestsGiveGoodwill
         public bool enableMinLootValue = true;
         public float minLootValueProOfReward = 30f;
         public int extraLootTries = 2;
-        public int extraLootMinWorthForTry = 200;
+        public int extraLootMinWorthForTry = 1000;
         public bool enableSilverRemainder = true;
+
+        public bool enableCleanupLogic = true;
+        public int cleanupItemWeight = 0;
 
         //// Boost Rewards
         public bool boostRewards = true;
@@ -38,6 +41,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
         //// debugging
         public bool debuggingOverflow = false;
+        public bool debuggingVerbose = false;
 
         public override void ExposeData()
         {
@@ -48,11 +52,11 @@ namespace SirRolin.QuestsGiveGoodwill
             Scribe_Values.Look(ref maxGoodwillGain, "maxGoodwillGain", 20);
             Scribe_Values.Look(ref maxGoodwillLoss, "maxGoodwillLoss", 20);
             Scribe_Values.Look(ref canGoodwillBeNegative, "canGoodwillBeNegative", true);
-            Scribe_Values.Look(ref tooMuchGoodwillGivesExtraLoot, "tooMuchGoodwillGivesExtraLoot", true);
+            Scribe_Values.Look(ref tooMuchGoodwillGivesSilver, "tooMuchGoodwillGivesExtraLoot", true);
 
             //// Honour
             Scribe_Values.Look(ref honourIgnoresGoodwill, "honourIgnoresGoodwill", true);
-            Scribe_Values.Look(ref honourWorth, "honourWorth", 100f);
+            Scribe_Values.Look(ref honourWorth, "honourWorth", 665f);
 
             //// SpecificLootBehaivior
             Scribe_Values.Look(ref campLootIgnoresGoodwill, "campLootIgnoresGoodwill", true);
@@ -60,8 +64,11 @@ namespace SirRolin.QuestsGiveGoodwill
             Scribe_Values.Look(ref enableMinLootValue, "enableMinLootValue", true);
             Scribe_Values.Look(ref minLootValueProOfReward, "minLootValueProOfReward", 30f);
             Scribe_Values.Look(ref extraLootTries, "extraLootTries", 2);
-            Scribe_Values.Look(ref extraLootMinWorthForTry, "extraLootMinWorthForTry", 200);
+            Scribe_Values.Look(ref extraLootMinWorthForTry, "extraLootMinWorthForTry", 1000);
             Scribe_Values.Look(ref enableSilverRemainder, "enableSilverRemainder", true);
+
+            Scribe_Values.Look(ref enableCleanupLogic, "enableCleanupLogic", true);
+            Scribe_Values.Look(ref cleanupItemWeight, "cleanupItemWeight", 0);
 
             //// Boost Rewards
             Scribe_Values.Look(ref enableMinLootValue, "boostRewards", true);
@@ -69,6 +76,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
             //// debugging
             Scribe_Values.Look(ref debuggingOverflow, "debuggingOverflow", false);
+            Scribe_Values.Look(ref debuggingVerbose, "debuggingVerbose", false);
 
             base.ExposeData();
         }

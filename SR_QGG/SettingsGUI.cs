@@ -30,6 +30,7 @@ namespace SirRolin.QuestsGiveGoodwill
         private string extraFlatGoodwillText;
         private string extraLootTriesText;
         private string extraLootMinWorthText;
+        private string discardExtraWeightText;
 
         private string hounourWorthText;
         private string camplootProWorthText;
@@ -42,7 +43,7 @@ namespace SirRolin.QuestsGiveGoodwill
         private float totalContentHeight = 10000f; //// corrected on every frame.
         private float goodwillSectionHeight = 420f;
         private float honourSectionHeight = 124f;
-        private float itemSectionHeight = 420f;
+        private float itemSectionHeight = 520f;
 
         private int resetClicks = 0;
 
@@ -93,7 +94,7 @@ namespace SirRolin.QuestsGiveGoodwill
                 resetClicks++;
                 if (resetClicks > 5)
                 {
-                    resetALl();
+                    ResetAll();
                 }
             }
 
@@ -138,7 +139,7 @@ namespace SirRolin.QuestsGiveGoodwill
                 ref settings.extraGoodwillFlat,
                 min: -20, max: 20);
 
-            goodwillSection.CheckboxLabeled("Enable Goodwill Overflow to extra loot (default Yes)", ref settings.tooMuchGoodwillGivesExtraLoot, "If goodwill caps for some reason grant extra loot.");
+            goodwillSection.CheckboxLabeled("Enable Goodwill Overflow to silver (default Yes)", ref settings.tooMuchGoodwillGivesSilver, "If goodwill caps for some reason are met, it will give silve for the loss.");
 
 
             listingStandard.EndSection(goodwillSection);
@@ -152,10 +153,10 @@ namespace SirRolin.QuestsGiveGoodwill
             honourSection.CheckboxLabeled("Goodwill cannot be offered with Honour: ", ref settings.honourIgnoresGoodwill);
             if (!settings.honourIgnoresGoodwill)
                 CreateSliderPlusTextField(honourSection,
-                    "The worth of Honour in items? (Default 100) " + settings.honourWorth + "$",
+                    "The worth of Honour in items? (Default 665, vanilla 2000/3) " + settings.honourWorth + "$",
                     ref hounourWorthText,
                     ref settings.honourWorth,
-                    min: 50, max: 500,
+                    min: 50, max: 1000,
                     steps: 5);
 
             listingStandard.EndSection(honourSection);
@@ -198,15 +199,22 @@ namespace SirRolin.QuestsGiveGoodwill
                 settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 2)",
                 ref extraLootTriesText,
                 ref settings.extraLootTries,
-                min: 1, max: 4);
+                min: 1, max: 5);
                 
             CreateSliderPlusTextField(otherSection,
-                settings.extraLootMinWorthForTry + "$ minimally needed for additional loot generation tries. (default 200) - Setting this low and Item generation cycles high, will often result in more value, but less goodwill.",
+                settings.extraLootMinWorthForTry + "$ minimally needed for additional loot generation tries. (default 1000) - Setting this low and Item generation cycles high, will often result in more value, but less goodwill.",
                 ref extraLootMinWorthText,
                 ref settings.extraLootMinWorthForTry,
-                min: 0, max: 2000, steps: 5);
+                min: 500, max: 5500, steps: 5);
 
             otherSection.CheckboxLabeled("Give Silver for the remainder of the reward? (Default yes)", ref settings.enableSilverRemainder);
+
+            CreateSliderPlusTextField(otherSection,
+                "Discard overestimated loot weigth - When too much loot is generated, negative priorities keeping high cost items, while positive numbers prioritieses keeping low cost items.\nDefault 0.",
+                ref discardExtraWeightText,
+                ref settings.cleanupItemWeight,
+                min: -100, max: 100, steps: 1
+                );
 
             listingStandard.EndSection(otherSection);
 
@@ -216,8 +224,9 @@ namespace SirRolin.QuestsGiveGoodwill
             {
                 listingStandard.Gap();
                 listingStandard.Label("Developer Menu");
-                Listing_Standard devSec = listingStandard.BeginSection(24f, bottomBorder: 0);
+                Listing_Standard devSec = listingStandard.BeginSection(48f, bottomBorder: 0);
                 devSec.CheckboxLabeled("Debugging Overflow", ref settings.debuggingOverflow, "(Default No)");
+                devSec.CheckboxLabeled("Debugging Parameters", ref settings.debuggingVerbose, "(Default No)");
                 listingStandard.EndSection(devSec);
             }
 
@@ -269,7 +278,7 @@ namespace SirRolin.QuestsGiveGoodwill
             }
         }
 
-        private void resetALl()
+        private void ResetAll()
         {
             //// Goodwill
             maxGoodwillLossText = "20";
@@ -281,7 +290,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
             //// Honour
             settings.honourIgnoresGoodwill = true;
-            hounourWorthText = "100.0";
+            hounourWorthText = "665";
 
             //// SpecificLootBehaivior
             settings.campLootIgnoresGoodwill = true;
@@ -290,8 +299,10 @@ namespace SirRolin.QuestsGiveGoodwill
             settings.enableMinLootValue = true;
             minLootRewardText = "30.0";
             extraLootTriesText = "2";
-            extraLootMinWorthText = "200";
+            extraLootMinWorthText = "1000";
             settings.enableSilverRemainder = true;
+
+            discardExtraWeightText = "0";
 
 
             //// Boost Rewards
