@@ -19,8 +19,8 @@ namespace SirRolin.QuestsGiveGoodwill
         public bool tooMuchGoodwillGivesSilver = true;
 
         //// Honour
-        public bool honourIgnoresGoodwill = true;
-        public float honourWorth = 666f;
+        public bool honourIgnoresGoodwill = false;
+        public float honourWorth = 665f;
 
         //// SpecificLootBehaivior
         public bool campLootIgnoresGoodwill = true;

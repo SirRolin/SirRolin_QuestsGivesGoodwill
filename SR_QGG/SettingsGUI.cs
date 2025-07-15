@@ -23,7 +23,7 @@ namespace SirRolin.QuestsGiveGoodwill
         /// <summary>
         /// Settings Strings, can't be from a list, but can from an array or loose variables.
         /// </summary>
-        private string maxGoodwillLossText;
+        private string  maxGoodwillLossText;
         private string maxGoodwillGainText;
         private string goodwillWorthText;
         private string extraProGoodwillText;
@@ -32,7 +32,7 @@ namespace SirRolin.QuestsGiveGoodwill
         private string extraLootMinWorthText;
         private string discardExtraWeightText;
 
-        private string hounourWorthText;
+        private string honourWorthText;
         private string camplootProWorthText;
         private string minLootRewardText;
         private string boostRewardsProText;
@@ -111,7 +111,7 @@ namespace SirRolin.QuestsGiveGoodwill
                     ref maxGoodwillLossText,
                     ref settings.maxGoodwillLoss,
                     min: 0, max: 100,
-                    steps: 5);
+                    steps: 1);
             }
 
             CreateSliderPlusTextField(goodwillSection,
@@ -149,12 +149,12 @@ namespace SirRolin.QuestsGiveGoodwill
             //// Honour
             listingStandard.Label("Honour: ");
             Listing_Standard honourSection = listingStandard.BeginSection(honourSectionHeight, bottomBorder: 0);
-            honourSection.Label("When Honour is a reward, should I ignore goodwill? (Default Yes)");
-            honourSection.CheckboxLabeled("Goodwill cannot be offered with Honour: ", ref settings.honourIgnoresGoodwill);
+            honourSection.Label("When Honour is a reward, should I Skip it? (Default No)");
+            honourSection.CheckboxLabeled(settings.honourIgnoresGoodwill ? "Honour is generated only with vanilla quests" : "Honour has a silver value and can be rewarded.", ref settings.honourIgnoresGoodwill);
             if (!settings.honourIgnoresGoodwill)
                 CreateSliderPlusTextField(honourSection,
                     "The worth of Honour in items? (Default 665, vanilla 2000/3) " + settings.honourWorth + "$",
-                    ref hounourWorthText,
+                    ref honourWorthText,
                     ref settings.honourWorth,
                     min: 50, max: 1000,
                     steps: 5);
@@ -189,7 +189,7 @@ namespace SirRolin.QuestsGiveGoodwill
             if (settings.boostRewards)
             {
                 CreateSliderPlusTextField(otherSection,
-                    "Boost rewards by a %. (Default 20%)",
+                    "Boost rewards by a %. (Default 30%)",
                     ref boostRewardsProText,
                     ref settings.boostRewardsProcentage,
                     min: -100f, max: 500f, steps: 0.5f);
@@ -254,14 +254,16 @@ namespace SirRolin.QuestsGiveGoodwill
         private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref float settingRef, float min, float max, int degits = 1, string hover = null, float steps = 1f)
         {
             if (degits < 0) degits = 0;
-            ls.Label(label, tooltip: hover);
+            TaggedString taglabel = new TaggedString(label);
+            ls.Label(taglabel, -1f, tooltip: hover);
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
             textReference = String.Format("{0:N" + degits + "}", RoundToNearest(ls.Slider(settingRef, min, max), steps));
         }
 
-        private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref int settingRef, int min, int max, string hover = null, int steps = 1)
+        private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref int settingRef, int min, int max, string hover = "", int steps = 1)
         {
-            ls.Label(label, -1, hover);
+            TaggedString taglabel = new TaggedString(label);
+            ls.Label(taglabel, -1f, hover);
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
             textReference = ((int) RoundToNearest(ls.Slider(settingRef, min, max), steps)).ToString();
         }
@@ -289,8 +291,8 @@ namespace SirRolin.QuestsGiveGoodwill
             settings.canGoodwillBeNegative = true;
 
             //// Honour
-            settings.honourIgnoresGoodwill = true;
-            hounourWorthText = "665";
+            settings.honourIgnoresGoodwill = false;
+            honourWorthText = "665";
 
             //// SpecificLootBehaivior
             settings.campLootIgnoresGoodwill = true;
