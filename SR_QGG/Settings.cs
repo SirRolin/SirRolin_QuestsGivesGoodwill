@@ -28,7 +28,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
         public bool enableMinLootValue = true;
         public float minLootValueProOfReward = 30f;
-        public int extraLootTries = 2;
+        public int extraLootTries = 3;
         public int extraLootMinWorthForTry = 1000;
         public bool enableSilverRemainder = true;
 
@@ -63,7 +63,7 @@ namespace SirRolin.QuestsGiveGoodwill
             Scribe_Values.Look(ref campLootProcentValue, "campLootProcentValue", 50);
             Scribe_Values.Look(ref enableMinLootValue, "enableMinLootValue", true);
             Scribe_Values.Look(ref minLootValueProOfReward, "minLootValueProOfReward", 30f);
-            Scribe_Values.Look(ref extraLootTries, "extraLootTries", 2);
+            Scribe_Values.Look(ref extraLootTries, "extraLootTries", 3);
             Scribe_Values.Look(ref extraLootMinWorthForTry, "extraLootMinWorthForTry", 1000);
             Scribe_Values.Look(ref enableSilverRemainder, "enableSilverRemainder", true);
 

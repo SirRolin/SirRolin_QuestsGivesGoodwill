@@ -196,10 +196,10 @@ namespace SirRolin.QuestsGiveGoodwill
             }
 
             CreateSliderPlusTextField(otherSection,
-                settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 2)",
+                settings.extraLootTries + " item generation cycles. (Vanilla 1, Default 3)",
                 ref extraLootTriesText,
                 ref settings.extraLootTries,
-                min: 1, max: 5);
+                min: 1, max: 8);
                 
             CreateSliderPlusTextField(otherSection,
                 settings.extraLootMinWorthForTry + "$ minimally needed for additional loot generation tries. (default 1000) - Setting this low and Item generation cycles high, will often result in more value, but less goodwill.",
@@ -300,7 +300,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
             settings.enableMinLootValue = true;
             minLootRewardText = "30.0";
-            extraLootTriesText = "2";
+            extraLootTriesText = "3";
             extraLootMinWorthText = "1000";
             settings.enableSilverRemainder = true;
 

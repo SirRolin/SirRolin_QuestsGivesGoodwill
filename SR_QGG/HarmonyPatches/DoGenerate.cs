@@ -1,10 +1,12 @@
 ﻿using HarmonyLib;
 using Multiplayer.API;
 using RimWorld;
+using SirRolin.QuestsGiveGoodwill.HelpingFunctions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 using Verse;
 
 namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
@@ -12,85 +14,9 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
     [HarmonyPatch(typeof(RewardsGenerator), "DoGenerate")]
     public static class GoodwillGiver
     {
+        private const int MAXHONOUR = 12; /*Max Honour TO CONFIG*/
         public static System.Random rng = null;
         private static Goodwill_Settings settings = LoadedModManager.GetMod<SirRolin.QuestsGiveGoodwill.QuestsGiveGoodwill>().GetSettings<Goodwill_Settings>();
-
-        private class DiscardHelper
-        {
-            public List<(int count, float unitValue, Thing thing)> Things = new List<(int count, float unitValue, Thing thing)>();
-            public float estimationValue;
-            public DiscardHelper(float estimatedValue)
-            {
-                estimationValue = estimatedValue;
-            }
-            public void AddToList(int amount, Thing thing)
-            {
-                Things.Add((amount, thing.MarketValue, thing));
-            }
-            public DiscardHelper getCopy()
-            {
-                DiscardHelper output = new DiscardHelper(estimationValue);
-                Things.ForEach((each) =>
-                {
-                    output.AddToList(each.count, each.thing);
-                });
-                return output;
-            }
-            public float getValue()
-            {
-                return Things.Sum(x => x.count * x.unitValue);
-            }
-            public float getWeightedValue()
-            {
-                return Math.Abs(Things.Sum(x => x.count * x.unitValue) - estimationValue) + settings.cleanupItemWeight * Things.Sum(x => x.count);
-            }
-            public void ReplaceIfBetter(ref DiscardHelper dh, StringBuilder debugStrB)
-            {
-                if (dh.getWeightedValue() > getWeightedValue())
-                {
-                    if (settings.debuggingVerbose) debugStrB.Append("Discarded for new:\n" + dh.ToString());
-                    dh = this;
-                }
-                else if (settings.debuggingVerbose && (dh.Things.Count != Things.Count || dh.getValue() != getValue()))
-                {
-                    debugStrB.Append("Doesn't make it:\n" + ToString());
-                }
-            }
-            public void Execute(List<Reward> ri, ref float unaccountedValue)
-            {
-                unaccountedValue -= getValue();
-
-                Things.ForEach(thing =>
-                {
-                    thing.thing.stackCount -= thing.Item1;
-                });
-
-                for (int j = ri.Count - 1; j >= 0; j--)
-                {
-                    if (ri[j] is Reward_Items list)
-                    {
-                        for (int i = list.items.Count - 1; i >= 0; i--)
-                        {
-                            if (list.items[i].stackCount == 0)
-                            {
-                                list.items.RemoveAt(i);
-                            }
-                        }
-                    }
-                }
-            }
-            override public String ToString()
-            {
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine("Weight: " + getWeightedValue() + " - worth: " + getValue());
-                foreach (var (count, unitValue, thing) in Things)
-                {
-                    sb.AppendLine(count.ToString() + "x " + thing.GetCustomLabelNoCount() + " (" + Math.Round(count * unitValue, 2) + ", " + Math.Round(unitValue, 2) + "/u)");
-                }
-
-                return sb.ToString();
-            }
-        }
 
         private static void MyMPCompat(){
             if (rng == null)
@@ -109,10 +35,16 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             }
         }
 
-        private static Double getRngDouble()
+        private static Double GetRngDouble()
         {
             MyMPCompat();
             return rng.NextDouble();
+        }
+
+        private static int GetRangeRng(int min, int max)
+        {
+            MyMPCompat();
+            return rng.Next(min,max);
         }
 
         public static void Prefix(ref RewardsGeneratorParams parms)
@@ -134,28 +66,59 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             if (settings.debuggingVerbose)
             {
                 StringBuilder sb = new StringBuilder();
-                sb.Append("_result: " + PrintRewardList(__result) + "\nparms: " + parms.ToString());
+                sb.Append($"_result: {PrintRewardList(__result, parms)}\nparms: {parms}");
                 if (sb.Length > 0)
                     Log.Message(sb.ToString());
             }
 
-            bool flagIsGoodwillOrFavor = __result.Count==1 && (__result[0] is Reward_Goodwill || __result[0] is Reward_RoyalFavor);
+            bool flagIsGoodwillOrFavor = __result.Count==1 && (__result[0] is Reward_Goodwill || __result[0] is Reward_RoyalFavor rh);
 
-            if (!parms.thingRewardDisallowed || flagIsGoodwillOrFavor)
+            if (!parms.thingRewardDisallowed & parms.giverFaction != null || flagIsGoodwillOrFavor)
             {
-                float unaccountedReward = parms.rewardValue;
-                parms.thingRewardDisallowed = false;
+                float missingValue = parms.rewardValue;                
 
-                // Calculate the amount of value that's missing and getting the index of any goodwill while at it.
-                int goodwillIndex = CalculateWorthofList(__result, parms, settings, ref unaccountedReward);
+                //// Calculate the amount of value that's missing and getting the index of any goodwill while at it.
+                int goodwillIndex = CalculateWorthofList(__result, parms, settings, ref missingValue);
+
+                //// Try to Aim for this amount of Goodwill
+                int goodwillToAimFor = 0;
+
+                if (goodwillIndex != -1)
+                {
+                    ///min-max is a clamp, due to vanilla no caring about my config settings when it comes to giving goodwill. :P
+                    goodwillToAimFor = Math.Min(settings.maxGoodwillGain,Math.Max(settings.maxGoodwillLoss,((Reward_Goodwill)__result[goodwillIndex]).amount));
+
+                    missingValue += (((Reward_Goodwill)__result[goodwillIndex]).amount - goodwillToAimFor) * settings.goodwillWorth;
+
+                    ((Reward_Goodwill)__result[goodwillIndex]).amount = goodwillToAimFor;
+                }
+                else
+                {
+                    /// for the future for customisability of weight between greedy players (Negative) and generous players (Positive) | 20 = generosity | -100 max Greed | 100 max Generosity
+                    float rng = (float)GetRngDouble();
+                    float t = Randomness.SkewValue(rng, 20, -100, 100);
+
+                    int maxGoodwillLoss = settings.canGoodwillBeNegative ? -settings.maxGoodwillLoss : 0;
+                    goodwillToAimFor = Mathf.RoundToInt(Mathf.Lerp(maxGoodwillLoss, settings.maxGoodwillGain, t));
+
+                    //// Debugging
+                    if (settings.debuggingVerbose)
+                    {
+                        Log.Message($"Aimed for Goodwill: {goodwillToAimFor} due to Rng skew: rng({rng}): skewed ({t})");
+                    }
+
+                    missingValue -= (goodwillToAimFor * settings.goodwillWorth);
+                }
+
 
                 //// Generate new items before goodwill rewards are added.
-                TryGeneratingNewRewards(__result, parms, unaccountedReward);
+                TryGeneratingNewRewards(__result, parms, ref missingValue);
+
 
                 if (settings.tooMuchGoodwillGivesSilver)
-                    EnsureRewardWorth(__result, parms, settings, ref unaccountedReward);
+                    EnsureRewardWorth(__result, parms, settings, ref missingValue);
 
-                float goodwillWorthToAdd = unaccountedReward + parms.rewardValue * (settings.extraGoodwillPro / 100f) + (settings.extraGoodwillFlat * settings.goodwillWorth);
+                float goodwillWorthToAdd = missingValue + parms.rewardValue * (settings.extraGoodwillPro / 100f) + ((goodwillToAimFor + settings.extraGoodwillFlat) * settings.goodwillWorth);
 
                 if (parms.giverFaction != null && parms.giverFaction.CanEverGiveGoodwillRewards && !parms.thingRewardItemsOnly)
                 {
@@ -172,7 +135,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     goodwillReward.amount += goodwill;
 
                     //// Then account for the reward.
-                    unaccountedReward -= goodwillReward.amount * settings.goodwillWorth;
+                    missingValue -= goodwillReward.amount * settings.goodwillWorth;
 
                     //// finally we add the goodwill.
                     if (goodwillReward.amount > 0 || (goodwillReward.amount < 0 && settings.canGoodwillBeNegative))
@@ -191,10 +154,35 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     else if (goodwillReward.amount <= 0 && goodwillIndex != -1)
                     {
                         __result.Remove(__result[goodwillIndex]);
+                        goodwillIndex = -1;
                     }
                 }
+                //// If there's no faction, there can be no goodwil or honour
+                else if (parms.giverFaction == null)
+                {
+                    //// Generate new items before goodwill rewards are added.
+                    TryGeneratingNewRewards(__result, parms, ref missingValue);
 
-                generatedRewardValue = goodwillWorthToAdd - unaccountedReward;
+                    if (settings.tooMuchGoodwillGivesSilver)
+                        EnsureRewardWorth(__result, parms, settings, ref missingValue);
+                }
+
+                generatedRewardValue = goodwillWorthToAdd - missingValue;
+
+                /// I have a suspicioun that if there's goodwill in the rewards the loot is disbanded.
+                parms.allowGoodwill = true;
+
+                /// I know that if there's Honour in a reward and it wasn't a vanilla Honour Reward it gets disgarded.
+                if (!settings.honourIgnoresGoodwill && parms.giverFaction.allowRoyalFavorRewards)
+                {
+                    parms.allowRoyalFavor = true;
+                }
+
+                /// I know that if there's Items in a reward and it wasn't allowed originally it gets disgarded.
+                parms.thingRewardDisallowed = false;
+
+                /// ?
+                parms.allowDevelopmentPoints = true;
             }
             else
             {
@@ -205,9 +193,15 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             return __result;
         }
 
-        private static String PrintRewardList(List<Reward> rewards)
+        private static String PrintRewardList(List<Reward> rewards, RewardsGeneratorParams parms)
         {
             StringBuilder sb = new StringBuilder();
+            float sumValue = 0;
+            foreach (var reward in rewards)
+            {
+                sumValue += CalculateWorth(reward, settings, parms);
+            }
+            sb.AppendLine($"total: {sumValue}");
             foreach (var item in rewards)
             {
                 if (item is Reward_Items ri)
@@ -237,33 +231,61 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             return sb.ToString();
         }
 
-        private static float TryGeneratingNewRewards(List<Reward> __result, RewardsGeneratorParams parms, float unaccountedReward)
+        private static float TryGeneratingNewRewards(List<Reward> __result, RewardsGeneratorParams parms, ref float missingValue)
         {
-            if (unaccountedReward > settings.extraLootMinWorthForTry)
+            if (missingValue > settings.extraLootMinWorthForTry)
             {
+                int honourIndex = TypeIndexInList(__result, typeof(Reward_RoyalFavor));
+
+                /// If they are not allowed go figure, we can't generate lot and it throws an error.
+                bool originalThingsDisallowed = parms.thingRewardDisallowed;
+                parms.thingRewardDisallowed = false;
+
+                bool originalThingsRequired = parms.thingRewardRequired;
+                parms.thingRewardRequired = true;
+
                 //// Try to generate items, upto the settings amount.
                 for (int i = 1; i < settings.extraLootTries; i++)
                 {
-                    // TO DO make settings - Idea a list with slides to set the chance of individual rewards.
-                    if (Faction.OfEmpire != null && getRngDouble() < 0.5f)
+                    // TO DO make settings - Idea a list with slides to set the chance of individual types of rewards.
+                    if (Faction.OfEmpire != null /// Can only be rewarded to empire factions (from what I know)
+                        && (honourIndex == -1 || ((Reward_RoyalFavor) __result[honourIndex]).amount < MAXHONOUR /*Max Honour TO CONFIG*/) /// if we haven't hit the limit already
+                        && GetRngDouble() <  0.15f/*Favour RNG TO CONFIG*/) // random chance
                     {
-                        Reward_RoyalFavor rf = new Reward_RoyalFavor
+                        int honourAmount = GetRangeRng(1, (int)(missingValue / settings.honourWorth));
+                        if (honourAmount > MAXHONOUR)
                         {
-                            amount = rng.Next(1, (int) (unaccountedReward / settings.honourWorth)),
-                            faction = Faction.OfEmpire
-                        };
-                        __result.Add(rf);
-                        unaccountedReward -= rf.amount * settings.honourWorth;
+                            honourAmount = MAXHONOUR;
+                        }
+
+                        if (honourIndex == -1) { 
+                            Reward_RoyalFavor rf = new Reward_RoyalFavor
+                            {
+                                amount = honourAmount,
+                                faction = Faction.OfEmpire
+                            };
+                            honourIndex = __result.Count;
+                            __result.Add(rf);
+                            missingValue -= rf.amount * settings.honourWorth;
+                        } else if(__result[honourIndex] is Reward_RoyalFavor reward_RoyalFavor)
+                        {
+                            int was = reward_RoyalFavor.amount;
+                            reward_RoyalFavor.amount = honourAmount;
+                            missingValue -= (honourAmount - was) * settings.honourWorth;
+                        }
                     }
                     else
                     {
-                        GenerateNewItems(__result, parms, settings, ref unaccountedReward);
+                        GenerateNewItems(__result, parms, settings, ref missingValue);
                     }
-                    if (unaccountedReward <= settings.extraLootMinWorthForTry)
+                    if (missingValue <= settings.extraLootMinWorthForTry)
                     {
                         break;
                     }
                 }
+
+                parms.thingRewardDisallowed = originalThingsDisallowed;
+                parms.thingRewardRequired = originalThingsRequired;
             }
 
             // Merge multiple stacks of the same item into 1
@@ -288,12 +310,12 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
             // Cleanup if enabled
             if (settings.enableCleanupLogic)
-                ReduceItems(__result, ref unaccountedReward, settings.goodwillWorth * settings.extraGoodwillFlat);
+                ReduceItems(__result, ref missingValue, settings.goodwillWorth * settings.extraGoodwillFlat);
 
-            return unaccountedReward;
+            return missingValue;
         }
 
-        private static int CalculateWorthofList(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float unaccountedReward)
+        private static int CalculateWorthofList(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float missingValue)
         {
             int goodwillIndex = -1; //To check if there's already a goodwill for the faction.
             int counter = 0;
@@ -307,11 +329,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     {
                         goodwillIndex = counter;
                     }
-                    else
-                    {
-                        //// In case someone gives goodwill to someone else than the giverFaction
-                        unaccountedReward -= goodwill.amount * settings.goodwillWorth;
-                    }
+                    missingValue -= goodwill.amount * settings.goodwillWorth;
                 }
                 else if (reward is Reward_RoyalFavor favor)
                 {
@@ -319,36 +337,36 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     //// if it's Favour ignore goodwill.
                     if (settings.honourIgnoresGoodwill)
                     {
-                        unaccountedReward = 0;
+                        missingValue = 0;
                         break;
                     }
                     else
                     {
                         //// Decrease reward
-                        unaccountedReward -= favor.amount * settings.honourWorth;
+                        missingValue -= favor.amount * settings.honourWorth;
                     }
                 }
                 else if (reward is Reward_Pawn pawn)
                 {
                     //// Decrease reward by the value of the pawn - For Some Reason it's special
-                    unaccountedReward -= pawn.pawn.MarketValue;
+                    missingValue -= pawn.pawn.MarketValue;
                 }
                 else if (reward is Reward_CampLoot)
                 {
                     if (settings.campLootIgnoresGoodwill)
                     {
-                        unaccountedReward = 0;
+                        missingValue = 0;
                         break;
                     }
                     else
                     {
-                        unaccountedReward -= (settings.campLootProcentValue / 100) * parms.rewardValue;
+                        missingValue -= (settings.campLootProcentValue / 100) * parms.rewardValue;
                     }
                 }
                 else
                 {
                     //// Decrease reward by item value
-                    unaccountedReward -= reward.TotalMarketValue;
+                    missingValue -= reward.TotalMarketValue;
                 }
                 counter++;
             }
@@ -362,11 +380,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             //// Find out if it's goodwill
             if (reward is Reward_Goodwill goodwill)
             {
-                if (goodwill.faction != parms.giverFaction)
-                {
-                    //// In case someone gives goodwill to someone else than the giverFaction
-                    rewardAmount += goodwill.amount * settings.goodwillWorth;
-                }
+                rewardAmount += goodwill.amount * settings.goodwillWorth;
             }
             else if (reward is Reward_RoyalFavor favor)
             {
@@ -378,7 +392,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 else
                 {
                     //// Decrease reward by 200 times the favor
-                    rewardAmount -= favor.amount * settings.honourWorth;
+                    rewardAmount += favor.amount * settings.honourWorth;
                 }
             }
             else if (reward is Reward_Pawn pawn)
@@ -405,10 +419,10 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             return rewardAmount;
         }
 
-        private static void GenerateNewItems(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float unaccountedReward)
+        private static void GenerateNewItems(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float missingValue)
         {
             Reward_Items items = new Reward_Items();
-            float unaccountedAfterGoodwill = unaccountedReward;
+            float unaccountedAfterGoodwill = missingValue;
             float worthOfItemsGenerated;
             float originalRewardValue = parms.rewardValue;
             float originalMinGenRew = parms.minGeneratedRewardValue;
@@ -418,7 +432,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             parms.rewardValue = originalRewardValue;
             parms.minGeneratedRewardValue = originalMinGenRew;
 
-            unaccountedReward -= worthOfItemsGenerated;
+            missingValue -= worthOfItemsGenerated;
 
             AddItems(__result, items);
 
@@ -434,11 +448,14 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 if (sb.Length > 0)
                     Log.Message(sb.ToString());
                 else
-                    Log.Message("Quests Give Goodwill Overflow: Tried to Generate items, but couldn't generate item worth at least:" + originalMinGenRew + " but looking for " + unaccountedReward);
+                    Log.Message("Quests Give Goodwill Overflow: Tried to Generate items, but couldn't generate item worth at least:" + originalMinGenRew + " but looking for " + missingValue);
             }
         }
-        private static void ReduceItems(List<Reward> items, ref float unaccountedReward, float offset)
+        private static void ReduceItems(List<Reward> items, ref float missingValue, float offset)
         {
+            //// No Items? No need
+            if(items.Count == 0) return;
+
             List<(float mValue, Thing thing)> sortingList = new List<(float, Thing)>();
             foreach (var item in items)
             {
@@ -450,7 +467,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     }
                 }
             }
-            if (sortingList.Count == 0 || offset - unaccountedReward <= 0)
+            if (sortingList.Count == 0 || offset - missingValue <= 0)
             {
                 return;
             }
@@ -460,10 +477,10 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
             // Find highest value item that has a lower unit value than requested change
             int startIndex = 0;
-            while (sortingList[startIndex].mValue > offset - unaccountedReward)
+            /*while (sortingList[startIndex].mValue > offset - missingValue)
             {
                 startIndex++;
-                if (items.Count == startIndex)
+                if (sortingList.Count == startIndex)
                 {
                     break;
                 }
@@ -472,24 +489,28 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             if (startIndex > 0)
             {
                 startIndex--;
-            }
+            }*/
 
             // The best fit discard helper
-            DiscardHelper discardHelper = new DiscardHelper(offset - unaccountedReward);
+            DiscardHelper discardHelper = new DiscardHelper(offset - missingValue, settings.debuggingVerbose, settings.cleanupItemWeight);
 
             // for building up a strin to the debug.
             StringBuilder debugStrb = new StringBuilder();
             if (settings.debuggingVerbose)
             {
-                debugStrb.AppendLine("SR_QGG: Value to trim: " + (offset - unaccountedReward) + " - All items: ");
-                sortingList.Skip(startIndex).OrderBy(x => x.mValue).Do((thing) => { debugStrb.AppendLine(thing.thing.stackCount + "x " + thing.thing.GetCustomLabelNoCount() + " (" + thing.mValue + "/u)"); });
+                debugStrb.AppendLine("SR_QGG: Value to trim: " + (offset - missingValue) + " - All items: ");
+                try
+                {
+                    sortingList.Skip(startIndex).OrderBy(x => x.mValue).Do((thing) => { debugStrb.AppendLine(thing.thing.stackCount + "x " + thing.thing.GetCustomLabelNoCount() + " (" + thing.mValue + "/u)"); });
+                }
+                catch { }
             }
 
             // Initiate the construction of the many examples.
             // The way this works is by recursively calling the recursiveAdding, which only adds to the list at the end of the sorting list OR if it has exceeded it's cost.
             for (int i = startIndex; i < sortingList.Count; i++)
             {
-                RecursiveAdding(ref discardHelper, sortingList, new DiscardHelper(offset - unaccountedReward), i, debugStrb);
+                RecursiveAdding(ref discardHelper, sortingList, new DiscardHelper(offset - missingValue, settings.debuggingVerbose, settings.cleanupItemWeight), i, debugStrb);
             }
 
 
@@ -502,7 +523,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             }
 
             // Only executing the one found the most worth.
-            discardHelper.Execute(items, ref unaccountedReward);
+            discardHelper.Execute(items, ref missingValue);
             discardHelper = null;
 
 
@@ -546,7 +567,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
         private static void RecursiveAdding(ref DiscardHelper currentBestDiscard, List<(float mValue, Thing thing)> choiceItems, DiscardHelper currentChecker, int currentIndex, StringBuilder debugStrB)
         {
             // max of this items we could remove
-            int maxItems = (int)Math.Ceiling((currentChecker.estimationValue - currentChecker.getValue()) / choiceItems[currentIndex].mValue);
+            int maxItems = (int)Math.Ceiling((currentChecker.wantedValue - currentChecker.GetValue()) / choiceItems[currentIndex].mValue);
 
             // Limit it to the amount we have.
             maxItems = Math.Min(maxItems, choiceItems[currentIndex].thing.stackCount);
@@ -568,7 +589,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 currentChecker.ReplaceIfBetter(ref currentBestDiscard, debugStrB);
 
                 // add the floor
-                if (maxItems > 1 && (currentChecker.getValue() > currentChecker.estimationValue))
+                if (maxItems > 1 && (currentChecker.GetValue() > currentChecker.wantedValue))
                 {
                     otherChecker.AddToList(maxItems - 1, choiceItems[currentIndex].thing);
                     otherChecker.ReplaceIfBetter(ref currentBestDiscard, debugStrB);
@@ -630,11 +651,11 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             }
         }
 
-        private static void EnsureRewardWorth(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float unaccountedReward)
+        private static void EnsureRewardWorth(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float missingValue)
         {
-            if (unaccountedReward > 0 && settings.boostRewards)
+            if (missingValue > 0 && settings.boostRewards)
             {
-                unaccountedReward -= Grant_silver_reward(__result, settings, /*parms.rewardValue -*/ unaccountedReward);
+                missingValue -= Grant_silver_reward(__result, settings, /*parms.rewardValue -*/ missingValue);
             }
         }
 
@@ -674,6 +695,22 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             newParm.thingRewardDisallowed = parms.thingRewardDisallowed;
             newParm.disallowedThingDefs = parms.disallowedThingDefs;
             newParm.chosenPawnSignal = parms.chosenPawnSignal;
+        }
+
+        private static int TypeIndexInList(List<Reward> __result, Type type)
+        {
+            int counter = 0;
+
+            foreach (Reward reward in __result)
+            {
+                if(reward != null && type.IsAssignableFrom(reward.GetType()))
+                {
+                    return counter;
+                }
+                counter++;
+            }
+
+            return -1;
         }
     }
 }
