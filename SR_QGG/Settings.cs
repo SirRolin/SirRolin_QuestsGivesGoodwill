@@ -39,6 +39,8 @@ namespace SirRolin.QuestsGiveGoodwill
         public bool boostRewards = true;
         public float boostRewardsProcentage = 20f;
 
+        public int maxGoodwillCap = 100;
+
         //// debugging
         public bool debuggingOverflow = false;
         public bool debuggingVerbose = false;
@@ -73,6 +75,9 @@ namespace SirRolin.QuestsGiveGoodwill
             //// Boost Rewards
             Scribe_Values.Look(ref enableMinLootValue, "boostRewards", true);
             Scribe_Values.Look(ref minLootValueProOfReward, "boostRewardsProcentage", 20f);
+
+            ////Compatibility
+            Scribe_Values.Look(ref maxGoodwillCap, "maxGoodwillCap", 100);
 
             //// debugging
             Scribe_Values.Look(ref debuggingOverflow, "debuggingOverflow", false);

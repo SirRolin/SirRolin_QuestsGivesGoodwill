@@ -34,6 +34,8 @@ namespace SirRolin.QuestsGiveGoodwill
         private string minLootRewardText;
         private string boostRewardsProText;
 
+        private string maxGWCapText; //maxGoodwillCap
+
         private Vector2 scrollPositions = new Vector2(0f, 0f);
 
         private const float ScrollBarWidthMargin = 20f;
@@ -215,6 +217,21 @@ namespace SirRolin.QuestsGiveGoodwill
 
             listingStandard.EndSection(otherSection);
 
+            //// Comptibility
+
+            listingStandard.Gap();
+            listingStandard.Label("Compatibility: ");
+            Listing_Standard CompSection = listingStandard.BeginSection(160, bottomBorder: 0);
+
+            CreateSliderPlusTextField(CompSection,
+                "in case you have a mod that changing the max goodwill cap for factions. Default 100.",
+                ref maxGWCapText,
+                ref settings.maxGoodwillCap,
+                min: 0, max: 10000, steps: 10
+                );
+
+
+            listingStandard.EndSection(CompSection);
 
             //// Debugging
             if (Prefs.DevMode)
@@ -253,6 +270,7 @@ namespace SirRolin.QuestsGiveGoodwill
             if (degits < 0) degits = 0;
             TaggedString taglabel = new TaggedString(label);
             ls.Label(taglabel, -1f, tooltip: hover);
+            textReference = settingRef.ToString();
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
             textReference = String.Format("{0:N" + degits + "}", RoundToNearest(ls.Slider(settingRef, min, max), steps));
         }
@@ -261,8 +279,14 @@ namespace SirRolin.QuestsGiveGoodwill
         {
             TaggedString taglabel = new TaggedString(label);
             ls.Label(taglabel, -1f, hover);
+            textReference = settingRef.ToString();
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
-            textReference = ((int) RoundToNearest(ls.Slider(settingRef, min, max), steps)).ToString();
+            int tempInt;
+            if (int.TryParse(textReference, out tempInt))
+            {
+                settingRef = tempInt;
+            }
+            settingRef = (int)RoundToNearest(ls.Slider(settingRef, min, max), steps);
         }
 
         private double RoundToNearest(double number, double multiple)
@@ -307,6 +331,9 @@ namespace SirRolin.QuestsGiveGoodwill
             //// Boost Rewards
             settings.boostRewards = true;
             boostRewardsProText = "20.0";
+
+            ////Compatibility
+            maxGWCapText = "100";
 
             //// debugging
             settings.debuggingOverflow = false;

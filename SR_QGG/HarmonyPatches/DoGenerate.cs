@@ -85,7 +85,10 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 if (goodwillIndex != -1)
                 {
                     ///min-max is a clamp, due to vanilla no caring about my config settings when it comes to giving goodwill. :P
-                    goodwillToAimFor = Math.Min(settings.maxGoodwillGain,Math.Max(settings.maxGoodwillLoss,((Reward_Goodwill)__result[goodwillIndex]).amount));
+                    goodwillToAimFor =  Math.Min(settings.maxGoodwillCap - parms.giverFaction.PlayerGoodwill,
+                                        Math.Min(settings.maxGoodwillGain,
+                                        Math.Max(-settings.maxGoodwillLoss,
+                                        ((Reward_Goodwill)__result[goodwillIndex]).amount)));
 
                     missingValue += (((Reward_Goodwill)__result[goodwillIndex]).amount - goodwillToAimFor) * settings.goodwillWorth;
 
@@ -99,6 +102,8 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
                     int maxGoodwillLoss = settings.canGoodwillBeNegative ? -settings.maxGoodwillLoss : 0;
                     goodwillToAimFor = Mathf.RoundToInt(Mathf.Lerp(maxGoodwillLoss, settings.maxGoodwillGain, t));
+
+                    goodwillToAimFor = Math.Min(settings.maxGoodwillCap - parms.giverFaction.PlayerGoodwill, goodwillToAimFor);
 
                     //// Debugging
                     if (settings.debuggingVerbose)
@@ -127,8 +132,8 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     goodwillReward.faction = parms.giverFaction;
 
                     //// Get the lowest of "missing goodwill for 100" & "max goodwill gain" & highest of -"Max Loss" & "Available Goodwill for the Amount"
-                    int goodwill = Math.Min(100 - goodwillReward.faction.PlayerGoodwill,
-                        Math.Min(settings.maxGoodwillGain + (parms.thingRewardDisallowed ? 100 : 0), // If it only allows goodwill reward, don't limit it.
+                    int goodwill = Math.Min(settings.maxGoodwillCap - goodwillReward.faction.PlayerGoodwill,
+                        Math.Min((parms.thingRewardDisallowed ? settings.maxGoodwillCap : settings.maxGoodwillGain), // If it only allows goodwill reward, limit it to max, otherwise limit it to settings.
                         Math.Max(-settings.maxGoodwillLoss,
                         (int)Math.Ceiling(goodwillWorthToAdd / settings.goodwillWorth))));
 
