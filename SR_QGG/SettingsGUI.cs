@@ -1,29 +1,26 @@
 ﻿using RimWorld;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using Verse;
-using Verse.Noise;
 
 namespace SirRolin.QuestsGiveGoodwill
 {
-    class QuestsGiveGoodwill : Mod
+    public class QuestsGiveGoodwill : Mod
     {
-        public Goodwill_Settings settings;
+        public static Goodwill_Settings settings;
         /// <summary>
         /// A mandatory constructor which resolves the reference to our settings.
         /// </summary>
         /// <param name="content"></param>
         public QuestsGiveGoodwill(ModContentPack content) : base(content)
         {
-            this.settings = GetSettings<Goodwill_Settings>();
+            settings = GetSettings<Goodwill_Settings>();
         }
 
         /// <summary>
         /// Settings Strings, can't be from a list, but can from an array or loose variables.
         /// </summary>
-        private string  maxGoodwillLossText;
+        private string maxGoodwillLossText;
         private string maxGoodwillGainText;
         private string goodwillWorthText;
         private string extraProGoodwillText;
@@ -153,7 +150,7 @@ namespace SirRolin.QuestsGiveGoodwill
             honourSection.CheckboxLabeled(settings.honourIgnoresGoodwill ? "Honour is generated only with vanilla quests" : "Honour has a silver value and can be rewarded.", ref settings.honourIgnoresGoodwill);
             if (!settings.honourIgnoresGoodwill)
                 CreateSliderPlusTextField(honourSection,
-                    "The worth of Honour in items? (Default 665, vanilla 2000/3) " + settings.honourWorth + "$",
+                    "The worth of Honour in items? (Default 200, vanilla 2000/3 (compared by gold)) " + settings.honourWorth + "$",
                     ref honourWorthText,
                     ref settings.honourWorth,
                     min: 50, max: 1000,
@@ -292,7 +289,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
             //// Honour
             settings.honourIgnoresGoodwill = false;
-            honourWorthText = "665";
+            honourWorthText = "200";
 
             //// SpecificLootBehaivior
             settings.campLootIgnoresGoodwill = true;

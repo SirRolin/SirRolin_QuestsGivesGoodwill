@@ -20,7 +20,7 @@ namespace SirRolin.QuestsGiveGoodwill
 
         //// Honour
         public bool honourIgnoresGoodwill = false;
-        public float honourWorth = 665f;
+        public float honourWorth = 200f;
 
         //// SpecificLootBehaivior
         public bool campLootIgnoresGoodwill = true;
@@ -55,8 +55,8 @@ namespace SirRolin.QuestsGiveGoodwill
             Scribe_Values.Look(ref tooMuchGoodwillGivesSilver, "tooMuchGoodwillGivesExtraLoot", true);
 
             //// Honour
-            Scribe_Values.Look(ref honourIgnoresGoodwill, "honourIgnoresGoodwill", true);
-            Scribe_Values.Look(ref honourWorth, "honourWorth", 665f);
+            Scribe_Values.Look(ref honourIgnoresGoodwill, "honourIgnoresGoodwill", false);
+            Scribe_Values.Look(ref honourWorth, "honourWorth", 200f);
 
             //// SpecificLootBehaivior
             Scribe_Values.Look(ref campLootIgnoresGoodwill, "campLootIgnoresGoodwill", true);

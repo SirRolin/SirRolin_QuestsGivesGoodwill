@@ -57,7 +57,6 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
         }
 
 
-
         public static List<Reward> Postfix(List<Reward> __result, RewardsGeneratorParams parms, out float generatedRewardValue)
         {
             settings = LoadedModManager.GetMod<SirRolin.QuestsGiveGoodwill.QuestsGiveGoodwill>().GetSettings<Goodwill_Settings>();
@@ -92,7 +91,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
                     ((Reward_Goodwill)__result[goodwillIndex]).amount = goodwillToAimFor;
                 }
-                else
+                else if (parms.giverFaction.allowGoodwillRewards) // if the faction can't give goodwill don't aim for any. (example permanent hostile factions)
                 {
                     /// for the future for customisability of weight between greedy players (Negative) and generous players (Positive) | 20 = generosity | -100 max Greed | 100 max Generosity
                     float rng = (float)GetRngDouble();
@@ -111,9 +110,10 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 }
 
 
+                AdjustHonour(__result, ref missingValue);
+
                 //// Generate new items before goodwill rewards are added.
                 TryGeneratingNewRewards(__result, parms, ref missingValue);
-
 
                 if (settings.tooMuchGoodwillGivesSilver)
                     EnsureRewardWorth(__result, parms, settings, ref missingValue);
@@ -128,7 +128,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
                     //// Get the lowest of "missing goodwill for 100" & "max goodwill gain" & highest of -"Max Loss" & "Available Goodwill for the Amount"
                     int goodwill = Math.Min(100 - goodwillReward.faction.PlayerGoodwill,
-                        Math.Min(settings.maxGoodwillGain + (parms.thingRewardDisallowed ? 100 : 0), /* If it only allows goodwill reward, don't limit it. */
+                        Math.Min(settings.maxGoodwillGain + (parms.thingRewardDisallowed ? 100 : 0), // If it only allows goodwill reward, don't limit it.
                         Math.Max(-settings.maxGoodwillLoss,
                         (int)Math.Ceiling(goodwillWorthToAdd / settings.goodwillWorth))));
 
@@ -310,9 +310,34 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
 
             // Cleanup if enabled
             if (settings.enableCleanupLogic)
-                ReduceItems(__result, ref missingValue, settings.goodwillWorth * settings.extraGoodwillFlat);
+                ReduceItems(__result, ref missingValue);
+
 
             return missingValue;
+        }
+
+        private static void AdjustHonour(List<Reward> rewards, ref float missingValue)
+        {
+            if (rewards.Count == 0) return;
+            if (settings.honourIgnoresGoodwill) return;
+            foreach (var reward in rewards)
+            {
+                if (reward is Reward_RoyalFavor reward_Honour)
+                {
+                    int honour = Math.Min(1,
+                                 Math.Max(12,
+                                 Mathf.FloorToInt(reward_Honour.amount + (-missingValue / settings.honourWorth))));
+                    int initial = reward_Honour.amount;
+                    float initialMissingValue = missingValue;
+                    missingValue -= (honour - reward_Honour.amount) * settings.honourWorth;
+                    reward_Honour.amount = honour;
+
+                    if (settings.debuggingVerbose)
+                    {
+                        Log.Message($"Honour amount changed from {initial} to {honour}, changing missing value from {initialMissingValue} to {missingValue}");
+                    }
+                }
+            }
         }
 
         private static int CalculateWorthofList(List<Reward> __result, RewardsGeneratorParams parms, Goodwill_Settings settings, ref float missingValue)
@@ -451,7 +476,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     Log.Message("Quests Give Goodwill Overflow: Tried to Generate items, but couldn't generate item worth at least:" + originalMinGenRew + " but looking for " + missingValue);
             }
         }
-        private static void ReduceItems(List<Reward> items, ref float missingValue, float offset)
+        private static void ReduceItems(List<Reward> items, ref float missingValue)
         {
             //// No Items? No need
             if(items.Count == 0) return;
@@ -467,7 +492,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     }
                 }
             }
-            if (sortingList.Count == 0 || offset - missingValue <= 0)
+            if (sortingList.Count == 0 || missingValue > 0)
             {
                 return;
             }
@@ -475,42 +500,26 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             // Sort
             sortingList.SortByDescending(thing => thing.mValue);
 
-            // Find highest value item that has a lower unit value than requested change
-            int startIndex = 0;
-            /*while (sortingList[startIndex].mValue > offset - missingValue)
-            {
-                startIndex++;
-                if (sortingList.Count == startIndex)
-                {
-                    break;
-                }
-            }
-            // if it's not the first, start at the item that costs slightly more than the requested change.
-            if (startIndex > 0)
-            {
-                startIndex--;
-            }*/
-
             // The best fit discard helper
-            DiscardHelper discardHelper = new DiscardHelper(offset - missingValue, settings.debuggingVerbose, settings.cleanupItemWeight);
+            DiscardHelper discardHelper = new DiscardHelper(-missingValue, settings.debuggingVerbose, settings.cleanupItemWeight);
 
             // for building up a strin to the debug.
             StringBuilder debugStrb = new StringBuilder();
             if (settings.debuggingVerbose)
             {
-                debugStrb.AppendLine("SR_QGG: Value to trim: " + (offset - missingValue) + " - All items: ");
+                debugStrb.AppendLine("SR_QGG: Value to trim: " + (-missingValue) + " - All items: ");
                 try
                 {
-                    sortingList.Skip(startIndex).OrderBy(x => x.mValue).Do((thing) => { debugStrb.AppendLine(thing.thing.stackCount + "x " + thing.thing.GetCustomLabelNoCount() + " (" + thing.mValue + "/u)"); });
+                    sortingList.OrderBy(x => x.mValue).Do((thing) => { debugStrb.AppendLine(thing.thing.stackCount + "x " + thing.thing.GetCustomLabelNoCount() + " (" + thing.mValue + "/u)"); });
                 }
                 catch { }
             }
 
             // Initiate the construction of the many examples.
             // The way this works is by recursively calling the recursiveAdding, which only adds to the list at the end of the sorting list OR if it has exceeded it's cost.
-            for (int i = startIndex; i < sortingList.Count; i++)
+            for (int i = 0; i < sortingList.Count; i++)
             {
-                RecursiveAdding(ref discardHelper, sortingList, new DiscardHelper(offset - missingValue, settings.debuggingVerbose, settings.cleanupItemWeight), i, debugStrb);
+                RecursiveAdding(ref discardHelper, sortingList, new DiscardHelper(-missingValue, settings.debuggingVerbose, settings.cleanupItemWeight), i, debugStrb);
             }
 
 
@@ -655,7 +664,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
         {
             if (missingValue > 0 && settings.boostRewards)
             {
-                missingValue -= Grant_silver_reward(__result, settings, /*parms.rewardValue -*/ missingValue);
+                missingValue -= Grant_silver_reward(__result, settings, missingValue);
             }
         }
 
@@ -680,7 +689,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             return 0;
         }
 
-        // unused due to thinking initialising a params and copying gave error quests, not confirmed though.
+        // unused due to thinking initialising a params and copying gave error quests, confirmed false.
         private static void CopyParms(RewardsGeneratorParams parms, RewardsGeneratorParams newParm)
         {
             newParm.allowDevelopmentPoints = parms.allowDevelopmentPoints;
