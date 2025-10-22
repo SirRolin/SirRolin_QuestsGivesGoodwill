@@ -114,8 +114,7 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                     missingValue -= (goodwillToAimFor * settings.goodwillWorth);
                 }
 
-
-                AdjustHonour(__result, ref missingValue);
+                PrioHonour(__result, ref missingValue, ref goodwillToAimFor);
 
                 //// Generate new items before goodwill rewards are added.
                 TryGeneratingNewRewards(__result, parms, ref missingValue);
@@ -321,26 +320,20 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             return missingValue;
         }
 
-        private static void AdjustHonour(List<Reward> rewards, ref float missingValue)
+        /***
+         * Priorities Honour by adjusting goodwill aim, if that value is too high.
+         */
+        private static void PrioHonour(List<Reward> rewards, ref float missingValue, ref int goodwillToAimFor)
         {
-            if (rewards.Count == 0) return;
             if (settings.honourIgnoresGoodwill) return;
+            if (rewards.Count == 0) return;
+            if (missingValue > 0) return;
             foreach (var reward in rewards)
             {
                 if (reward is Reward_RoyalFavor reward_Honour)
                 {
-                    int honour = Math.Min(1,
-                                 Math.Max(12,
-                                 Mathf.FloorToInt(reward_Honour.amount + (-missingValue / settings.honourWorth))));
-                    int initial = reward_Honour.amount;
-                    float initialMissingValue = missingValue;
-                    missingValue -= (honour - reward_Honour.amount) * settings.honourWorth;
-                    reward_Honour.amount = honour;
-
-                    if (settings.debuggingVerbose)
-                    {
-                        Log.Message($"Honour amount changed from {initial} to {honour}, changing missing value from {initialMissingValue} to {missingValue}");
-                    }
+                    goodwillToAimFor -= (int) Math.Ceiling(-missingValue * settings.goodwillWorth);
+                    return;
                 }
             }
         }
