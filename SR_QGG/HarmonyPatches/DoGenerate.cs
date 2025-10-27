@@ -85,10 +85,10 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
                 if (goodwillIndex != -1)
                 {
                     ///min-max is a clamp, due to vanilla no caring about my config settings when it comes to giving goodwill. :P
-                    goodwillToAimFor =  Math.Min(settings.maxGoodwillCap - parms.giverFaction.PlayerGoodwill,
-                                        Math.Min(settings.maxGoodwillGain,
-                                        Math.Max(-settings.maxGoodwillLoss,
-                                        ((Reward_Goodwill)__result[goodwillIndex]).amount)));
+                    goodwillToAimFor =  Math.Min(settings.maxGoodwillCap - parms.giverFaction.PlayerGoodwill, // missing for cap
+                                        Math.Min(settings.maxGoodwillGain, // max allowed per reward
+                                        Math.Max(-settings.maxGoodwillLoss, // max loss per reward
+                                        ((Reward_Goodwill)__result[goodwillIndex]).amount))); // the amount that the quest already have
 
                     missingValue += (((Reward_Goodwill)__result[goodwillIndex]).amount - goodwillToAimFor) * settings.goodwillWorth;
 
@@ -332,7 +332,9 @@ namespace SirRolin.QuestsGiveGoodwill.HarmonyPatches
             {
                 if (reward is Reward_RoyalFavor reward_Honour)
                 {
-                    goodwillToAimFor -= (int) Math.Ceiling(-missingValue * settings.goodwillWorth);
+                    int tempValue = goodwillToAimFor;
+                    goodwillToAimFor -= (int) Math.Ceiling(((float) reward_Honour.amount) * (settings.honourWorth / settings.goodwillWorth));
+                    missingValue += (tempValue - goodwillToAimFor) * settings.goodwillWorth;
                     return;
                 }
             }
