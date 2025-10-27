@@ -224,7 +224,7 @@ namespace SirRolin.QuestsGiveGoodwill
             Listing_Standard CompSection = listingStandard.BeginSection(160, bottomBorder: 0);
 
             CreateSliderPlusTextField(CompSection,
-                "in case you have a mod that changing the max goodwill cap for factions. Default 100.",
+                "Max goodwill cap for factions. Default 100.",
                 ref maxGWCapText,
                 ref settings.maxGoodwillCap,
                 min: 0, max: 10000, steps: 10
@@ -272,7 +272,12 @@ namespace SirRolin.QuestsGiveGoodwill
             ls.Label(taglabel, -1f, tooltip: hover);
             textReference = settingRef.ToString();
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
-            textReference = String.Format("{0:N" + degits + "}", RoundToNearest(ls.Slider(settingRef, min, max), steps));
+            float tempValue;
+            if (float.TryParse(textReference, out tempValue))
+            {
+                settingRef = tempValue;
+            }
+            settingRef = (float) RoundToNearest(RoundToNearest(ls.Slider(settingRef, min, max), steps), Math.Pow(0.1, degits));
         }
 
         private void CreateSliderPlusTextField(Listing_Standard ls, string label, ref string textReference, ref int settingRef, int min, int max, string hover = "", int steps = 1)
@@ -281,10 +286,10 @@ namespace SirRolin.QuestsGiveGoodwill
             ls.Label(taglabel, -1f, hover);
             textReference = settingRef.ToString();
             ls.TextFieldNumeric(ref settingRef, ref textReference, min, max);
-            int tempInt;
-            if (int.TryParse(textReference, out tempInt))
+            int tempValue;
+            if (int.TryParse(textReference, out tempValue))
             {
-                settingRef = tempInt;
+                settingRef = tempValue;
             }
             settingRef = (int)RoundToNearest(ls.Slider(settingRef, min, max), steps);
         }
